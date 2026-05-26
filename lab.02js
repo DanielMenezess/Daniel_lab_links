@@ -1,0 +1,80 @@
+// lab02.js
+// Disciplina: Backend | Node.js | 2025-2026
+// Exercício 2: Filtrar e Classificar Links (Internos vs Externos)
+
+const https = require('https');
+
+const URL_ALVO = 'https://books.toscrape.com';
+const DOMINIO_BASE = 'books.toscrape.com';
+
+/**
+ * Faz uma requisição HTTPS e retorna o HTML completo da página.
+ */
+function buscarHTML(url) {
+    return new Promise((resolve, reject) => {
+        https.get(url, (res) => {
+            let html = '';
+            res.on('data', chunk => html += chunk);
+            res.on('end', () => resolve(html));
+        }).on('error', (err) => {
+            reject(err);
+        });
+    });
+}
+
+/**
+ * Extrai todos os links href de um HTML usando Regex.
+ */
+function extrairLinks(html) {
+    const regex = /href="([^"]+)"/g;
+    const matches = [...html.matchAll(regex)];
+    return matches.map(m => m[1]);
+}
+
+/**
+ * Classifica links em internos e externos.
+ * @param {string[]} links - Array de URLs/links
+ * @param {string} dominio - Domínio base para comparação
+ * @returns {Object} - { internos: string[], externos: string[] }
+ */
+function classificarLinks(links, dominio) {
+    const internos = [];
+    const externos = [];
+
+    for (const link of links) {
+        // Link relativo (começa com /)
+        if (link.startsWith('/')) {
+            internos.push(link);
+        } else {
+            try {
+                // Usar construtor URL para comparar domínios de forma robusta
+                const urlObj = new URL(link);
+                if (urlObj.hostname === dominio) {
+                    internos.push(link);
+                } else {
+                    externos.push(link);
+                }
+            } catch (err) {
+                // Se não for uma URL válida (ex: mailto:, javascript:), ignora
+                // ou classifica como externo dependendo do caso
+                externos.push(link);
+            }
+        }
+    }
+
+    return { internos, externos };
+}
+
+// Execução principal
+buscarHTML(URL_ALVO)
+    .then(html => {
+        const links = extrairLinks(html);
+        const { internos, externos } = classificarLinks(links, DOMINIO_BASE);
+
+        console.log(`=== Links Internos: ${internos.length} ===`);
+        internos.forEach(link => console.log(link));
+
+        console.log(`\n=== Links Externos: ${externos.length} ===`);
+        externos.forEach(link => console.log(link));
+    })
+    .catch(err => console.error('Erro:', err.message));

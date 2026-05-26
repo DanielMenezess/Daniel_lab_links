@@ -1,0 +1,85 @@
+// lab01.js
+// Disciplina: Backend | Node.js | 2025-2026
+// Exercício 1: Primeira Requisição e Extração de Links
+
+const https = require('https');
+
+const URL_ALVO = 'https://books.toscrape.com';
+
+/**
+ * Faz uma requisição HTTPS e retorna o HTML completo da página.
+ * @param {string} url - URL a ser buscada
+ * @returns {Promise<string>} - HTML completo da página
+ */
+function buscarHTML(url) {
+    return new Promise((resolve, reject) => {
+        // TODO 1: usar https.get para buscar a URL
+        https.get(url, (res) => {
+            let html = '';
+
+            // TODO 2: acumular os chunks em uma variável html
+            res.on('data', chunk => html += chunk);
+
+            // TODO 3: ao finalizar (evento 'end'), chamar resolve(html)
+            res.on('end', () => resolve(html));
+
+        }).on('error', (err) => {
+            // TODO 4: em caso de erro, chamar reject(err)
+            reject(err);
+        });
+    });
+}
+
+/**
+ * Extrai todos os links href de um HTML usando Regex.
+ * @param {string} html - Conteúdo HTML
+ * @returns {string[]} - Array com todas as URLs encontradas
+ */
+function extrairLinks(html) {
+    // TODO 5: criar uma Regex com a flag 'g' para capturar href="..."
+    const regex = /href="([^"]+)"/g;
+
+    // TODO 6: retornar um array com todas as URLs encontradas
+    const matches = [...html.matchAll(regex)];
+    return matches.map(m => m[1]);
+}
+
+// Execução principal
+buscarHTML(URL_ALVO)
+    .then(html => {
+        const links = extrairLinks(html);
+        console.log(`Total de links encontrados: ${links.length}`);
+        links.forEach(link => console.log(link));
+    })
+    .catch(err => console.error('Erro:', err.message));
+
+
+// ═══════════════════════════════════════════════════════════════
+// PERGUNTAS DE REFLEXÃO (responder como comentário no ficheiro)
+// ═══════════════════════════════════════════════════════════════
+
+/*
+1. O que acontece se a URL usar HTTP em vez de HTTPS? O mesmo módulo funciona?
+
+   RESPOSTA: Não, o módulo https NÃO funciona para URLs HTTP. 
+   O módulo https é específico para conexões SSL/TLS (porta 443).
+   Para URLs HTTP (porta 80), deve-se usar o módulo http nativo do Node.js:
+   const http = require('http');
+
+   Se tentarmos usar https.get() com uma URL http://, ocorrerá um erro
+   de protocolo, pois o módulo https espera um handshake TLS que não
+   existe em conexões HTTP puras.
+
+2. Por que o evento 'data' pode ser disparado múltiplas vezes?
+
+   RESPOSTA: O evento 'data' é disparado múltiplas vezes porque o Node.js
+   recebe os dados da resposta HTTP em "chunks" (pedaços) através de streams.
+
+   O protocolo TCP/IP fragmenta os dados em pacotes menores para transmissão
+   eficiente pela rede. Cada vez que um chunk chega ao buffer, o evento 'data'
+   é emitido. Isso permite processar grandes respostas sem carregar tudo na
+   memória de uma só vez (processamento em streaming).
+
+   Por isso acumulamos os chunks (html += chunk) até o evento 'end' indicar
+   que toda a resposta foi recebida.
+*/

@@ -1,0 +1,77 @@
+// lab03.js
+// Disciplina: Backend | Node.js | 2025-2026
+// Exercício 3: Normalizar URLs Relativas
+
+const https = require('https');
+const { URL } = require('url');
+
+const URL_ALVO = 'https://books.toscrape.com';
+const URL_BASE = 'https://books.toscrape.com';
+
+/**
+ * Faz uma requisição HTTPS e retorna o HTML completo da página.
+ */
+function buscarHTML(url) {
+    return new Promise((resolve, reject) => {
+        https.get(url, (res) => {
+            let html = '';
+            res.on('data', chunk => html += chunk);
+            res.on('end', () => resolve(html));
+        }).on('error', (err) => {
+            reject(err);
+        });
+    });
+}
+
+/**
+ * Extrai todos os links href de um HTML usando Regex.
+ */
+function extrairLinks(html) {
+    const regex = /href="([^"]+)"/g;
+    const matches = [...html.matchAll(regex)];
+    return matches.map(m => m[1]);
+}
+
+/**
+ * Recebe um array de links (mistos) e a URL base.
+ * Retorna um array de URLs absolutas únicas.
+ * Links que não sejam http/https devem ser ignorados (ex: mailto:, javascript:).
+ * 
+ * @param {string[]} links - Array de links (relativos e absolutos)
+ * @param {string} urlBase - URL base para resolver links relativos
+ * @returns {string[]} - Array de URLs absolutas únicas
+ */
+function normalizarLinks(links, urlBase) {
+    const absolutas = new Set();
+
+    for (const link of links) {
+        try {
+            // TODO 1: usar new URL(link, urlBase) para resolver links relativos
+            const urlResolvida = new URL(link, urlBase);
+
+            // TODO 2: filtrar apenas protocolos http e https
+            if (urlResolvida.protocol === 'http:' || urlResolvida.protocol === 'https:') {
+                absolutas.add(urlResolvida.href);
+            }
+        } catch (err) {
+            // Ignorar URLs inválidas (mailto:, javascript:, etc.)
+            continue;
+        }
+    }
+
+    // TODO 3: remover duplicatas com Set (já feito acima)
+    return [...absolutas];
+}
+
+// Execução principal
+buscarHTML(URL_ALVO)
+    .then(html => {
+        const links = extrairLinks(html);
+        const linksNormalizados = normalizarLinks(links, URL_BASE);
+
+        console.log(`Links originais encontrados: ${links.length}`);
+        console.log(`Links absolutos únicos: ${linksNormalizados.length}\n`);
+        console.log('=== Links Normalizados ===');
+        linksNormalizados.forEach(link => console.log(link));
+    })
+    .catch(err => console.error('Erro:', err.message));

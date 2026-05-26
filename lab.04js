@@ -1,0 +1,138 @@
+// lab04.js
+// Disciplina: Backend | Node.js | 2025-2026
+// Exercício 4: Desafio — Mini Crawler de 2 Níveis
+
+const https = require('https');
+const { URL } = require('url');
+const fs = require('fs');
+
+const URL_INICIAL = 'https://books.toscrape.com';
+const DOMINIO_BASE = 'books.toscrape.com';
+const LIMITE_PAGINAS = 5;
+
+const visitados = new Set();
+const todosLinks = new Set();
+
+/**
+ * Faz uma requisição HTTPS e retorna o HTML completo da página.
+ */
+function buscarHTML(url) {
+    return new Promise((resolve, reject) => {
+        https.get(url, (res) => {
+            let html = '';
+            res.on('data', chunk => html += chunk);
+            res.on('end', () => resolve(html));
+        }).on('error', (err) => {
+            reject(err);
+        });
+    });
+}
+
+/**
+ * Extrai todos os links href de um HTML usando Regex.
+ */
+function extrairLinks(html) {
+    const regex = /href="([^"]+)"/g;
+    const matches = [...html.matchAll(regex)];
+    return matches.map(m => m[1]);
+}
+
+/**
+ * Normaliza links relativos para URLs absolutas.
+ * Filtra apenas protocolos http/https e remove duplicatas.
+ */
+function normalizarLinks(links, urlBase) {
+    const absolutas = new Set();
+
+    for (const link of links) {
+        try {
+            const urlResolvida = new URL(link, urlBase);
+            if (urlResolvida.protocol === 'http:' || urlResolvida.protocol === 'https:') {
+                absolutas.add(urlResolvida.href);
+            }
+        } catch (err) {
+            continue;
+        }
+    }
+
+    return [...absolutas];
+}
+
+/**
+ * Filtra apenas os links internos (mesmo domínio).
+ */
+function filtrarInternos(links, dominio) {
+    return links.filter(link => {
+        try {
+            const urlObj = new URL(link);
+            return urlObj.hostname === dominio;
+        } catch {
+            return false;
+        }
+    });
+}
+
+/**
+ * Função recursiva de crawling.
+ * @param {string} url - URL a ser visitada
+ * @param {number} profundidade - Nível atual de profundidade (0 = inicial)
+ */
+async function crawl(url, profundidade = 0) {
+    // Limite de páginas visitadas
+    if (visitados.size >= LIMITE_PAGINAS) return;
+
+    // Evitar visitar a mesma URL duas vezes
+    if (visitados.has(url)) return;
+
+    visitados.add(url);
+    console.log(`[${visitados.size}/${LIMITE_PAGINAS}] Visitando: ${url}`);
+
+    try {
+        // TODO: buscar HTML, extrair links, normalizar
+        const html = await buscarHTML(url);
+        const linksBrutos = extrairLinks(html);
+        const linksNormalizados = normalizarLinks(linksBrutos, url);
+
+        // Acumular todos os links encontrados
+        linksNormalizados.forEach(link => todosLinks.add(link));
+
+        // TODO: se profundidade < 1, chamar crawl para cada link interno
+        if (profundidade < 1) {
+            const linksInternos = filtrarInternos(linksNormalizados, DOMINIO_BASE);
+
+            for (const linkInterno of linksInternos) {
+                if (visitados.size >= LIMITE_PAGINAS) break;
+                await crawl(linkInterno, profundidade + 1);
+            }
+        }
+
+    } catch (err) {
+        console.error(`  Erro ao visitar ${url}: ${err.message}`);
+    }
+}
+
+// Execução principal
+crawl(URL_INICIAL)
+    .then(() => {
+        console.log('\n═══════════════════════════════════════════');
+        console.log(`Total de links únicos coletados: ${todosLinks.size}`);
+        console.log(`Páginas visitadas: ${visitados.size}`);
+        console.log('═══════════════════════════════════════════\n');
+
+        console.log('=== Links Únicos Coletados ===');
+        [...todosLinks].sort().forEach(link => console.log(link));
+
+        // ═══════════════════════════════════════════════════════════════
+        // DESAFIO EXTRA (BÔNUS): Salvar em links.json
+        // ═══════════════════════════════════════════════════════════════
+        const dados = {
+            urlInicial: URL_INICIAL,
+            paginasVisitadas: visitados.size,
+            totalLinksUnicos: todosLinks.size,
+            links: [...todosLinks].sort()
+        };
+
+        fs.writeFileSync('links.json', JSON.stringify(dados, null, 2), 'utf-8');
+        console.log('\n✅ Dados salvos em links.json');
+    })
+    .catch(err => console.error('Erro geral:', err.message));
